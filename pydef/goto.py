@@ -228,7 +228,7 @@ def find_attribute(filename, start, word, lines):
                 return Cursor(filename, i)
 
 
-def goto_definition(path, filename, cursor, source):
+def goto_definition(path, filename, cursor, source=None):
     if not source:
         source = open(filename, 'r').read()
     lines = source.splitlines()

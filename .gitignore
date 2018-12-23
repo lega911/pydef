@@ -5,3 +5,5 @@ MANIFEST
 Makefile
 dist/
 .pytest_cache
+*.sublime-project
+*.sublime-workspace
