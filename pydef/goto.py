@@ -55,12 +55,15 @@ def is_assign(line, word):
     if re.match(word + r'\s*=', line):
         return 'var'
     if line.startswith('import '):
-        return 'import'
-    r = re.match(r'from\s+[\w\d\.]+\s+import\s+(.*)$', line)
-    if r:
-        r = re.split(r'[\s\,]+', r.groups()[0])
-        if word in r:
-            return 'import2'
+        im = parse_import(line)
+        if word in im.result:
+            return 'import'
+    else:
+        r = re.match(r'from\s+[\w\d\.]+\s+import\s+', line)
+        if r:
+            im = parse_import(line)
+            if word in im.result:
+                return 'import2'
 
 
 def get_lvl(line):
@@ -151,6 +154,27 @@ def get_module_filename(name, path=None):
             return module_name + '/__init__.py'
 
 
+def parse_import(line):
+    r = re.match(r'^\s*import\s+(.*)$', line)
+    if r:
+        libs_line = r.groups()[0]
+        root_lib = None
+    else:
+        r = re.match(r'^\s*from\s+([\w\d\.\_]+)\s+import\s+(.*)$', line)
+        root_lib = r.groups()[0]
+        libs_line = r.groups()[1]
+
+    result = {}
+    parts = re.split(r'\s*,\s*', libs_line)
+    for d in parts:
+        d = d.split(' as ')
+        if len(d) == 1:
+            result[d[0]] = d[0]
+        else:
+            result[d[1]] = d[0]
+    return SN(lib=root_lib, result=result)
+
+
 def find_in_file(word, filename, start=None, lines=None, path=None):
     if not lines:
         lines = open(filename).readlines()
@@ -159,19 +183,17 @@ def find_in_file(word, filename, start=None, lines=None, path=None):
         return
 
     if assign.kind == 'import':
-        line = list(map(str.strip, assign.line.split('import ')[1].split(',')))
-        if word in line:
-            module_name = word
-        else:
-            raise NotImplementedError
+        im = parse_import(assign.line)
+        module_name = im.result.get(word)
+        assert module_name
 
         module_name = get_module_filename(module_name, path=path)
         if module_name:
             return Cursor(module_name)
         return
     elif assign.kind == 'import2':
-        r = re.match(r'from\s+([\w\d\.\_]+)\s+import', assign.line)
-        bmodule = r.groups()[0]
+        im = parse_import(assign.line)
+        bmodule = im.lib
         if bmodule[0] == '.':
             module_name = filename
             if bmodule == '.':
@@ -186,6 +208,7 @@ def find_in_file(word, filename, start=None, lines=None, path=None):
             for name in names[1:]:
                 module_name = get_module_filename(name, path=[os.path.dirname(module_name)])
 
+        word = im.result.get(word, word)
         return find_in_file(word, filename=module_name)
     elif assign.kind in ('def', 'var', 'args'):
         return SN(filename=filename, line=assign.lineno, kind=assign.kind)

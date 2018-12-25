@@ -1,7 +1,9 @@
 
 import lib
+import lib as L2
 from lib import bar, \
-    foo
+    foo, test as test_system
+from lib import System as SS
 
 
 class OS:
@@ -16,8 +18,12 @@ class OS:
 
         b200 = 1  # @var_b200
         tmp = a100 + b200
+        self.get_version()  # @get_name.get_version
+        test_system()  # @get_name.test_system
+        SS.read()  # @get_name.ss_read
+        L2.bar()  # @get_name.L2.bar
 
         return inner  # @return_inner
 
-    def get_version(self):
+    def get_version(self):  # @OS.get_version
         return foo() + lib.bar()  # @main_version_body
