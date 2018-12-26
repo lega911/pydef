@@ -27,7 +27,7 @@ def is_assign(line, word):
     if line.startswith('def '):
         r = re.match(r'def\s*[^\()]+\(([^\()]*)\)', line)
         if r:
-            r = re.split(r'[\s\,]+', r.groups()[0])
+            r = re.split(r'[\s\,=]+', r.groups()[0])
             if word in r:
                 return 'args'
     if re.match(word + r'\s*=', line):
@@ -47,6 +47,7 @@ def is_assign(line, word):
 _get_lvl_rx = re.compile(r'^([ \t]*)')
 rx_skip0 = re.compile(r'\s*$')
 rx_skip1 = re.compile(r'\s*\#')
+rx_def = re.compile(r'\s*def ')
 
 
 def get_lvl(line):
@@ -67,12 +68,18 @@ class Source:
 
     def get_line(self, index):
         result = self.lines[index]
-        while index > 0:
-            index -= 1
-            r = re.match(r'^(.*)\\\s*$', self.lines[index])
-            if not r:
-                break
-            result = r.groups()[0] + result
+        while index < len(self.lines):
+            r = re.match(r'^(.*)\\\s*$', result)
+            if r:
+                index += 1
+                result = r.groups()[0] + self.lines[index]
+                continue
+            if rx_def.match(result) and '):' not in result:
+                index += 1
+                result += self.lines[index]
+                continue
+            break
+
         return result
 
     def find_on_lvl(self, word, active_lvl, start, d=1):
@@ -136,8 +143,7 @@ class Source:
         result = self.find_on_lvl(word, lvl, start, d=-1)
         if not result:
             return
-
-        if result and result.kind != 'lvl':
+        elif result.kind != 'lvl':
             return result
 
         while True:
