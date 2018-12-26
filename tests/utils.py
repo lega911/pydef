@@ -31,16 +31,16 @@ def get_sample_root():
 
 
 def goto(word, tag):
-    filename, lineno = get_cursor(tag)
-    line = open(filename).readlines()[lineno]
+    filename, row = get_cursor(tag)
+    line = open(filename).readlines()[row]
     col = line.index(word) + len(word) - 1
 
     path = [get_sample_root()] + sys.path
     filename = os.path.join(get_sample_root(), filename)
 
-    return pydef.goto_definition(path, filename, (lineno, col), source=None)
+    return pydef.goto_definition(path, filename, row, col, source=None)
 
 
 def assert_pos(tag, b):
-    filename, line = get_cursor(tag)
-    assert filename == b.filename and line == b.line
+    filename, row = get_cursor(tag)
+    assert filename == b.filename and row == b.row

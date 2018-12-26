@@ -17,4 +17,4 @@ def test_check_variable():
     assert_pos('@lib.System.read', goto('SS.read', '@get_name.ss_read'))
     assert_pos('@lib.bar', goto('L2.bar', '@get_name.L2.bar'))
 
-    # assert_pos('@OS.get_version', goto('self.get_version', '@get_name.get_version'))
+    assert_pos('@OS.get_version', goto('self.get_version', '@get_name.get_version'))
