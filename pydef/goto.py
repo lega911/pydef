@@ -44,7 +44,7 @@ def is_assign(line, word):
                 return 'import2'
 
 
-_get_lvl_rx = re.compile(r'^(\s*)')
+_get_lvl_rx = re.compile(r'^([ \t]*)')
 rx_skip0 = re.compile(r'\s*$')
 rx_skip1 = re.compile(r'\s*\#')
 
@@ -271,9 +271,12 @@ class Context:
 
         for index in range(index, -1, -1):
             line = source.get_line(index)
+            if is_empty(line):
+                continue
+
             r = re.match(r'^\s*class ', line)
             if r:
-                return SN(row=index, line=line)
+                return SN(row=index, line=line, filename=filename)
 
             lvl = get_lvl(line)
             if not lvl:
@@ -297,9 +300,9 @@ def goto_definition(path, filename, row, col, source=None):
                 break
             elif result.kind == 'args':
                 class_ = ctx.find_class(result.filename, result.row)
-                if not result:
+                if not class_:
                     return
-                return ctx.find_attribute(result.filename, class_.row, word)
+                return ctx.find_attribute(class_.filename, class_.row, word)
             elif result.kind == 'var':
                 return None
         result = ctx.find_in_file(word, start=row, filename=filename)
