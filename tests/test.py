@@ -21,3 +21,5 @@ def test_check_variable():
 
     assert_pos('@OS.set_value0', goto('self', '@set_value.self'))
     assert_pos('@OS.set_value0', goto('timeout', '@set_value.timeout'))
+
+    assert goto('wrong_var', '@set_value.wrong_var') is None

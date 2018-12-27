@@ -28,7 +28,8 @@ class OS:
     def get_version(self):  # @OS.get_version
         return foo() + lib.bar()  # @main_version_body
 
-    def set_value(self, name,  # @OS.set_value0
+    def set_value(self, name,  # @OS.set_value0  , wrong_var
                   value, timeout=None, error=5):  # @OS.set_value1
         self  # @set_value.self
         timeout  # @set_value.timeout
+        wrong_var  # @set_value.wrong_var

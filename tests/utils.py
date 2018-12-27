@@ -18,7 +18,7 @@ def get_cursor(tag):
 
     for name in glob.glob(os.path.join(get_sample_root(), '**/*.py'), recursive=True):
         for i, s in enumerate(open(name)):
-            r = re.search(r'#\s*(\@[\w\d_\.]+)\s*$', s)
+            r = re.search(r'#\s*(\@[\w\d_\.]+)', s)
             if r:
                 tags[r.groups()[0]] = (name, i)
 

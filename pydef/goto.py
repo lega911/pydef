@@ -16,34 +16,6 @@ class Cursor:
         return '{}[{}:{}] ({})'.format(self.filename, self.row, self.col, self.kind)
 
 
-def is_assign(line, word):
-    if word not in line:
-        return
-    line = line.lstrip()
-    if re.match(r'class\s+' + word + r'\W', line):
-        return 'class'
-    if re.match(r'def\s+' + word + r'\W', line):
-        return 'def'
-    if line.startswith('def '):
-        r = re.match(r'def\s*[^\()]+\(([^\()]*)\)', line)
-        if r:
-            r = re.split(r'[\s\,=]+', r.groups()[0])
-            if word in r:
-                return 'args'
-    if re.match(word + r'\s*=', line):
-        return 'var'
-    if line.startswith('import '):
-        im = parse_import(line)
-        if word in im.result:
-            return 'import'
-    else:
-        r = re.match(r'from\s+[\w\d\.]+\s+import\s+', line)
-        if r:
-            im = parse_import(line)
-            if word in im.result:
-                return 'import2'
-
-
 _get_lvl_rx = re.compile(r'^([ \t]*)')
 rx_skip0 = re.compile(r'\s*$')
 rx_skip1 = re.compile(r'\s*\#')
@@ -66,22 +38,6 @@ class Source:
         else:
             self.lines = open(filename).readlines()
 
-    def get_line(self, index):
-        result = self.lines[index]
-        while index < len(self.lines):
-            r = re.match(r'^(.*)\\\s*$', result)
-            if r:
-                index += 1
-                result = r.groups()[0] + self.lines[index]
-                continue
-            if rx_def.match(result) and '):' not in result:
-                index += 1
-                result += self.lines[index]
-                continue
-            break
-
-        return result
-
     def find_on_lvl(self, word, active_lvl, start, d=1):
         index = start
         if d == 1:
@@ -91,14 +47,13 @@ class Source:
             left = 1
             right = len(self.lines) - 1
 
-        line = self.get_line(start)
-        kind = is_assign(line, word)
-        if kind:
-            return SN(row=start, line=line, kind=kind)
+        ae = self.get_assign(start, word)
+        if ae:
+            return ae
 
         while index >= left and index <= right:
             index += d
-            line = self.get_line(index)
+            line = self.lines[index]
             if is_empty(line):
                 continue
             lvl = get_lvl(line)
@@ -107,9 +62,150 @@ class Source:
             elif lvl < active_lvl:
                 return SN(kind='lvl', row=index, lvl=lvl)
 
-            kind = is_assign(line, word)
-            if kind and kind != 'args':
-                return SN(row=index, line=line, kind=kind)
+            ae = self.get_assign(index, word)
+            if ae and ae.kind != 'args':
+                return ae
+
+    rx_mas = re.compile(r'^(\s*)(def|import|from) ')
+
+    def get_assign(self, index, word):
+        line = self.lines[index]
+        if not line or is_empty(line):
+            return
+
+        r = self.rx_mas.match(line)
+        if r:
+            for i in range(5):
+                if index + i >= len(self.lines):
+                    return
+                if word in self.lines[index + i]:
+                    break
+            else:
+                return
+            lvl = len(r.groups()[0])
+            kind = r.groups()[1]
+            if kind == 'from':
+                kind = 'import2'
+
+            line = self.get_multiline(index)
+            if word not in line:
+                return
+
+            if kind in ('import', 'import2'):
+                im = parse_import(line)
+                if word not in im.result:
+                    return
+            else:
+                fl = parse_function(line)
+                if not fl:
+                    return
+                if fl.name == word:
+                    kind = 'def'
+                elif word in fl.args:
+                    kind = 'args'
+                else:
+                    return
+            return SN(kind=kind, lvl=lvl, line=line, row=index)
+        else:
+            if word not in line:
+                return
+
+            r = re.match(r'^(\s*)class\s+([\w\d_]+)\W', line)
+            if r and r.groups()[1] == word:
+                return SN(kind='class', lvl=len(r.groups()[0]), row=index, line=line)
+
+            r = re.match(r'^(\s*)([\w\d_]+)\s*=', line)
+            if r and r.groups()[1] == word:
+                return SN(kind='var', lvl=len(r.groups()[1]), row=index, line=line)
+
+    def get_multiline(self, index):
+        result = ''
+        more = False
+        quote = None
+        bracket = 0
+        prefix = False
+        spec = set('\'"()#\\')
+        while True:
+            if index >= len(self.lines):
+                return None  # wrong expression
+            line = self.lines[index].rstrip('\n')
+            index += 1
+            for i, a in enumerate(line):
+                if a not in spec:
+                    continue
+
+                if a == '\\' and i + 1 == len(line):
+                    result += line[:-1]
+                    more = True
+                    break
+
+                if quote:
+                    if prefix:
+                        prefix = False
+                        continue
+                    elif a == quote:
+                        quote = None
+                    elif a == '\\':
+                        prefix = True
+                    continue
+
+                if a in ('"', "'"):
+                    quote = a
+                    continue
+                elif a == '(':
+                    bracket += 1
+                    continue
+                elif a == ')':
+                    bracket -= 1
+                    continue
+                elif a == '#':
+                    result += line[:i] + '\n'
+                    break
+            else:
+                result += line + '\n'
+
+            if more:
+                more = False
+                continue
+            if bracket > 0:
+                continue
+            if quote:
+                return  # not closed quote
+
+            break
+
+        return result
+
+
+    def is_assign(self, line, word):
+        raise DeprecationWarning
+
+        if word not in line:
+            return
+
+        line = line.lstrip()
+        if re.match(r'class\s+' + word + r'\W', line):
+            return 'class'
+        if re.match(r'def\s+' + word + r'\W', line):
+            return 'def'
+        if line.startswith('def '):
+            r = re.match(r'def\s*[^\()]+\(([^\()]*)\)', line)
+            if r:
+                r = re.split(r'[\s\,=]+', r.groups()[0])
+                if word in r:
+                    return 'args'
+        if re.match(word + r'\s*=', line):
+            return 'var'
+        if line.startswith('import '):
+            im = parse_import(line)
+            if word in im.result:
+                return 'import'
+        else:
+            r = re.match(r'from\s+[\w\d\.]+\s+import\s+', line)
+            if r:
+                im = parse_import(line)
+                if word in im.result:
+                    return 'import2'
 
     def get_word(self, row, column):
         line = self.lines[row]
@@ -137,7 +233,7 @@ class Source:
             start = len(self.lines) - 1
             lvl = 0
         else:
-            line = self.get_line(start)
+            line = self.lines[start]
             lvl = get_lvl(line)
 
         result = self.find_on_lvl(word, lvl, start, d=-1)
@@ -185,6 +281,17 @@ def parse_import(line):
         else:
             result[d[1]] = d[0]
     return SN(lib=root_lib, result=result)
+
+
+def parse_function(line):
+    r = re.match(r'^(\s*)def\s*([\w\d_]+)\s*\(([^\()]*)\)', line)
+    if not r:
+        return
+
+    lvl = len(r.groups()[0])
+    func_name = r.groups()[1]
+    args = re.split(r'[\s\,=]+', r.groups()[2])
+    return SN(name=func_name, args=args, lvl=lvl)
 
 
 class Context:
@@ -246,11 +353,11 @@ class Context:
     def find_attribute(self, filename, start, word):
         source = self.get_source(filename)
 
-        line = source.get_line(start)
+        line = source.lines[start]
         class_lvl = get_lvl(line)
         alvl = None
         for i in range(start + 1, len(source.lines)):
-            line = source.get_line(i)
+            line = source.lines[i]
             if is_empty(line):
                 continue
             lvl = get_lvl(line)
@@ -276,7 +383,7 @@ class Context:
         source = self.get_source(filename)
 
         for index in range(index, -1, -1):
-            line = source.get_line(index)
+            line = source.lines[index]
             if is_empty(line):
                 continue
 
