@@ -9,7 +9,8 @@ def goto_definition(path, filename, row, col, source=None):
     """
     source = Source(filename, source=source)
     fullword = source.get_word(row, col)
-    # print('word', fullword)
+    if not fullword:
+        return
     ctx = Context([source], path=path)
 
     result = None

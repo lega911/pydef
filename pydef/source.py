@@ -149,14 +149,24 @@ class Source:
 
     def get_word(self, row, column):
         line = self.lines[row]
+        if not line:
+            return
+
         letters = string.digits + string.ascii_letters + '_.'
         i = column
+
+        if i >= len(line):
+            i = len(line) - 1
+
+        if i > 0 and line[i] not in letters:
+            i -= 1
 
         for start in range(i, -1, -1):
             if line[start] not in letters:
                 start += 1
                 break
 
+        end = start
         for end in range(start, len(line)):
             a = line[end]
             if a not in letters:
